@@ -2,32 +2,87 @@
  * Perform the Best Fit Decreasing algorithm to efficiently allocate pieces to bins.
  */
 function bestFitDecreasing() {
-  // Fetch data from the "Input" sheet and process it
-  var { pieces, quantities, stock_length } = fetchData();
+  // Call the fetchData() function and check for errors
+  var fetchDataResult = fetchData();
+
+  if (fetchDataResult.error) {
+    // Handle the error and display an alert dialog to the user
+    var errorMessage = "Error in fetchData(): " + fetchDataResult.error;
+    displayAlert("Error", errorMessage);
+    return; // Exit the function
+  }
+
+  // Continue with the rest of the code
+  var { pieces, quantities, stock_length } = fetchDataResult;
   var { material_needed_count, bins } = processCuts(pieces, quantities, stock_length);
-  
-  // Write the results to the "Output" sheet
+
+  // Check for errors in processCuts() and display alert if needed
+  if (material_needed_count === undefined || bins === undefined) {
+    displayAlert("Error", "Error in processCuts(): Unknown error occurred");
+    return; // Exit the function
+  }
+
+  // Call the writeData() function
   writeData(material_needed_count, bins);
 }
 
+function displayAlert(title, message) {
+  Browser.msgBox(title, message, Browser.Buttons.OK);
+}
+
 /**
- * Fetch data from the "Input" sheet.
- * @returns {object} An object containing pieces, quantities, and stock_length.
+ * Fetch data from the "Input" sheet, perform input validation, and handle errors.
+ * @returns {object} An object containing pieces, quantities, stock_length, or an error message.
  */
 function fetchData() {
   // Get the "Input" sheet
   var inputSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Input");
-  
+
+  if (!inputSheet) {
+    return { error: "Input sheet not found" };
+  }
+
   // Read data from the sheet
   var data = inputSheet.getRange("A2:C").getValues();
-  
+
+  // Validate the data
+  if (!Array.isArray(data) || data.length < 1) {
+    return { error: "No data found in the input sheet" };
+  }
+
   // Extract and filter pieces, quantities, and stock_length
   var pieces = data.map((column) => column[0]).filter((length) => length > 0);
   var quantities = data.map((column) => column[1]);
   var stock_length = inputSheet.getRange("C2").getValue();
 
+  // Validate the extracted data
+  if (!Array.isArray(pieces) || !Array.isArray(quantities) || isNaN(stock_length)) {
+    return { error: "Invalid data format in the input sheet" };
+  }
+
+  // Additional validation for pieces and quantities
+  if (pieces.length !== quantities.length) {
+    return { error: "Mismatched sizes of pieces and quantities arrays" };
+  }
+
+  for (var i = 0; i < pieces.length; i++) {
+    if (isNaN(pieces[i]) || isNaN(quantities[i])) {
+      return { error: "Invalid numerical format in pieces or quantities" };
+    }
+
+    if (pieces[i] > stock_length) {
+      return { error: "Piece length exceeds the stock length" };
+    }
+  }
+
   return { pieces, quantities, stock_length };
+
+  function displayAlert(title, message) {
+    var ui = SpreadsheetApp.getUi();
+    ui.alert(title, message, ui.ButtonSet.OK);
+  }
 }
+
 
 /**
  * Process the cuts using the Best Fit Decreasing algorithm.
